@@ -64,7 +64,7 @@
             </svg>
             <svg id="axesAndSeriesSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <path stroke="#999" stroke-width="2" fill="none" d="M10 90H90"/>
-                <path stroke="#999" stroke-width="2" fill="none" d="M50 90V10"/>
+                <path id="verticalAxis" stroke="#999" stroke-width="2" fill="none" d="M50 90V10"/>
                 <path id="redSeries" vector-effect="non-scaling-stroke" stroke="#F33" stroke-width="4" fill="none" d="M10 90"/>
             </svg>
         </div>
@@ -77,6 +77,7 @@
             <input id="NoverPSlider" type="range"/>
         </div>
         <script>
+            let isScaled = true;
             warningDiv.style.display = "none";
             fpSlider.addEventListener("input", () => {
                 fpValue.innerHTML = fpSlider.value / 100;
@@ -100,14 +101,19 @@
                     warningDiv.innerHTML = `If fp is zero, that means no one is eligible for jury duty!`;
                 }
 
-                for (let i = -1; i <= 1; i += 0.001) {
-                    const n_over_p = N / P - i;
-                    const p = parseInt(fp * P);
-                    const n = parseInt(n_over_p * p);
-                    if (n < 0 || n > N) continue;
-                    xAbsoluteValues.push(i);
+                const xMetric = 40;
+
+                const p = parseInt(fp * P);
+                for (let n = 0; n <= N; n++) {
+                    const i = N / P - n / p;
+                    if (isScaled) {
+                        xAbsoluteValues.push(2 * n / N - 1);
+                    } else {
+                        xAbsoluteValues.push(i);
+                    }
                     yAbsoluteValues.push(sampleDistribution(i, N, P, fp, n));
                 }
+                if (isScaled) verticalAxis.setAttribute(`d`, `M${(2 * fp - 1) * xMetric + 50} 90V10`);
 
                 if (xAbsoluteValues.length === 0) {
                     warningDiv.innerHTML = "fp is too high or the subpopulation N is too small.";
@@ -119,7 +125,6 @@
                     redSeries.style.display = "block";
                 }
 
-                const xMetric = 40;
                 const yMetric = 80 / Math.max(...yAbsoluteValues);
 
                 let pathString = `M${50 + xMetric * xAbsoluteValues[0]} ${90 - yMetric * yAbsoluteValues[0]}`;
