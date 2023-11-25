@@ -1,0 +1,140 @@
+<!DOCTYPE html>
+<html>
+    <head>
+        <title>Interactive Jury Distribution</title>
+    </head>
+    <style>
+        .sliderLabel {
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+        }
+        .valueLabel {
+            width: 100%;
+            box-sizing: border-box;
+            text-align: center;
+            color: #999;
+        }
+        #controlsDiv {
+            position: absolute;
+            right: 0;
+            top: 50%;
+            margin-right: 10px;
+            transform: translate(0, -50%);
+            border: 3px solid #999;
+        }
+        #graphDiv {
+            position: absolute;
+            left: 10%;
+            top: 50%;
+            width: 50%;
+            height: 50%;
+            transform: translate(0, -50%);
+        }
+        #graphBackgroundSvg {
+            width: 100%;
+            height: 100%;
+        }
+        #axesAndSeriesSvg {
+            position: absolute;
+            left: 0;
+            top: 0;
+            width: 100%;
+            height: 100%;
+        }
+        #warningDiv {
+            position: absolute;
+            top: 5%;
+            left: 50%;
+            transform: translate(-50%, 0%);
+            border: 3px solid #900;
+            background: #FAB;
+            display: none;
+            width: 40%;
+            min-width: 200px;
+            padding: 10px;
+            border-radius: 10px;
+        }
+    </style>
+    <body onload="redrawGraph()">
+        <div id="warningDiv"></div>
+        <div id="graphDiv">
+            <svg id="graphBackgroundSvg">
+                <rect stroke="#999" stroke-width="4px" fill="none" x="1%" y="1%" width="98%" height="98%" rx="15"/>
+            </svg>
+            <svg id="axesAndSeriesSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
+                <path stroke="#999" stroke-width="2" fill="none" d="M10 90H90"/>
+                <path stroke="#999" stroke-width="2" fill="none" d="M50 90V10"/>
+                <path id="redSeries" vector-effect="non-scaling-stroke" stroke="#F33" stroke-width="4" fill="none" d="M10 90"/>
+            </svg>
+        </div>
+        <div id="controlsDiv">
+            <div class="sliderLabel">fp</div>
+            <div id="fpValue" class="valueLabel">0.5</div>
+            <input id="fpSlider" type="range"/>
+        </div>
+        <script>
+            warningDiv.style.display = "none";
+            fpSlider.addEventListener("input", () => {
+                fpValue.innerHTML = fpSlider.value / 100;
+                redrawGraph();
+            });
+            function redrawGraph() {
+                let xAbsoluteValues = [];
+                let yAbsoluteValues = [];
+
+                const fp = fpSlider.value / 100;
+                const N = 300;
+                const P = 3000;
+
+                if (fp === 0) {
+                    redSeries.style.display = "none";
+                    warningDiv.style.display = "block";
+                    warningDiv.innerHTML = `If fp is zero, that means no one is eligible for jury duty!`;
+                }
+
+                for (let i = -1; i <= 1; i += 0.001) {
+                    const n_over_p = N / P - i;
+                    const p = parseInt(fp * P);
+                    const n = parseInt(n_over_p * p);
+                    if (n < 0 || n > N) continue;
+                    xAbsoluteValues.push(i);
+                    yAbsoluteValues.push(sampleDistribution(i, N, P, fp, n));
+                }
+
+                if (xAbsoluteValues.length === 0) {
+                    warningDiv.innerHTML = "fp is too high or the subpopulation N is too small.";
+                    warningDiv.style.display = "block";
+                    redSeries.style.display = "none";
+                    return;
+                } else {
+                    warningDiv.style.display = "none";
+                    redSeries.style.display = "block";
+                }
+
+                const xMetric = 40;
+                const yMetric = 80 / Math.max(...yAbsoluteValues);
+
+                let pathString = `M${50 + xMetric * xAbsoluteValues[0]} ${90 - yMetric * yAbsoluteValues[0]}`;
+                for (let i = 1; i < xAbsoluteValues.length; i++) {
+                    pathString += `L${50 + xMetric * xAbsoluteValues[i]} ${90 - yMetric * yAbsoluteValues[i]}`;
+                }
+                redSeries.setAttribute("d", pathString);
+            }
+            function sampleDistribution(i, N, P, fp, n) {
+                const N_minus_n = N - n;
+                let binomialCoefficient = 1;
+                for (let q = 2; q <= n; q++) binomialCoefficient /= q;
+                for (let q = N_minus_n; q <= N; q++) binomialCoefficient *= q;
+                // If the binomialCoefficient is infinite, assume that a normal approximation would work here
+                if (isFinite(binomialCoefficient)) {
+                    return Math.pow(fp, n) * Math.pow(1 - fp, N_minus_n) * binomialCoefficient;
+                } else {
+                    const sigma = Math.sqrt(N * fp * (1 - fp));
+                    const mu = N * fp;
+                    return 1 / Math.sqrt(2 * Math.PI) / sigma * Math.exp(Math.pow(n - mu, 2) / 2 / Math.pow(sigma, 2));
+                }
+            }
+        </script>
+    </body>
+</html>
