@@ -4,6 +4,9 @@
         <title>Interactive Jury Distribution</title>
     </head>
     <style>
+        input {
+            width: 100%;
+        }
         .sliderLabel {
             width: 100%;
             box-sizing: border-box;
@@ -22,6 +25,11 @@
             margin-right: 10px;
             transform: translate(0, -50%);
             border: 3px solid #999;
+            padding: 10px;
+            border-radius: 10px;
+            max-width: 200px;
+            width: 40%;
+            min-width: 100px;
         }
         #graphDiv {
             position: absolute;
@@ -63,16 +71,18 @@
                 <rect stroke="#999" stroke-width="4px" fill="none" x="1%" y="1%" width="98%" height="98%" rx="15"/>
             </svg>
             <svg id="axesAndSeriesSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
-                <path stroke="#999" stroke-width="2" fill="none" d="M10 90H90"/>
-                <path id="verticalAxis" stroke="#999" stroke-width="2" fill="none" d="M50 90V10"/>
+                <path stroke="#999" vector-effect="non-scaling-stroke" stroke-width="3" fill="none" d="M10 90H90"/>
+                <path id="verticalAxis" vector-effect="non-scaling-stroke" stroke="#999" stroke-width="3" fill="none" d="M50 90V10"/>
                 <path id="redSeries" vector-effect="non-scaling-stroke" stroke="#F33" stroke-width="4" fill="none" d="M10 90"/>
+                <path id="supremeCourtLine" vector-effect="non-scaling-stroke" stroke-dasharray="10,10" stroke="#009" stroke-width="2" fill="none" d="M50 90V10"/>
+                <path id="acluLine" vector-effect="non-scaling-stroke" stroke-dasharray="10,10" stroke="#090" stroke-width="2" fill="none" d="M50 90V10"/>
             </svg>
         </div>
         <div id="controlsDiv">
-            <div class="sliderLabel">fp</div>
+            <div class="sliderLabel">Jury eligibility rate of general population</div>
             <div id="fpValue" class="valueLabel">0.5</div>
             <input id="fpSlider" type="range"/>
-            <div class="sliderLabel">N/P</div>
+            <div class="sliderLabel">Fraction of general population that is part of the subpopulation</div>
             <div id="NoverPValue" class="valueLabel">0.5</div>
             <input id="NoverPSlider" type="range"/>
         </div>
@@ -84,7 +94,7 @@
                 redrawGraph();
             });
             NoverPSlider.addEventListener("input", () => {
-                NoverPValue.innerHTML = NoverPSlider.value / 100;
+                NoverPValue.innerHTML = Math.pow(10, NoverPSlider.value / 100 * 3 - 3).toExponential(2);
                 redrawGraph();
             });
             function redrawGraph() {
@@ -93,7 +103,7 @@
 
                 const fp = fpSlider.value / 100;
                 const P = 3000;
-                const N = parseInt(P * NoverPSlider.value / 100);
+                const N = parseInt(P * Math.pow(10, NoverPSlider.value / 100 * 3 - 3));
 
                 if (fp === 0) {
                     redSeries.style.display = "none";
@@ -111,9 +121,16 @@
                     } else {
                         xAbsoluteValues.push(i);
                     }
-                    yAbsoluteValues.push(sampleDistribution(i, N, P, fp, n));
+                    yAbsoluteValues.push(sampleDistribution(i, N, fp, n));
                 }
-                if (isScaled) verticalAxis.setAttribute(`d`, `M${(2 * fp - 1) * xMetric + 50} 90V10`);
+                if (isScaled) {
+                    verticalAxis.setAttribute(`d`, `M${(2 * fp - 1) * xMetric + 50} 90V10`);
+                    supremeCourtLine.setAttribute(`d`, `M${(2 * (fp + 0.1) - 1) * xMetric + 50} 90V10`);
+                    acluLine.setAttribute(`d`, `M${(2 * (fp * N + Math.sqrt(N * fp * (1 - fp))) / N - 1) * xMetric + 50} 90V10`);
+                } else {
+                    verticalAxis.setAttribute(`d`, `M50 90V10`);
+                    supremeCourtLine.setAttribute(`d`, `M55 90V10`);
+                }
 
                 if (xAbsoluteValues.length === 0) {
                     warningDiv.innerHTML = "fp is too high or the subpopulation N is too small.";
@@ -133,7 +150,7 @@
                 }
                 redSeries.setAttribute("d", pathString);
             }
-            function sampleDistribution(i, N, P, fp, n) {
+            function sampleDistribution(i, N, fp, n) {
                 const N_minus_n = N - n;
                 let binomialCoefficient = 1;
                 for (let q = 2; q <= n; q++) binomialCoefficient /= q;
