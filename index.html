@@ -72,6 +72,9 @@
             <div class="sliderLabel">fp</div>
             <div id="fpValue" class="valueLabel">0.5</div>
             <input id="fpSlider" type="range"/>
+            <div class="sliderLabel">N/P</div>
+            <div id="NoverPValue" class="valueLabel">0.5</div>
+            <input id="NoverPSlider" type="range"/>
         </div>
         <script>
             warningDiv.style.display = "none";
@@ -79,13 +82,17 @@
                 fpValue.innerHTML = fpSlider.value / 100;
                 redrawGraph();
             });
+            NoverPSlider.addEventListener("input", () => {
+                NoverPValue.innerHTML = NoverPSlider.value / 100;
+                redrawGraph();
+            });
             function redrawGraph() {
                 let xAbsoluteValues = [];
                 let yAbsoluteValues = [];
 
                 const fp = fpSlider.value / 100;
-                const N = 300;
                 const P = 3000;
+                const N = parseInt(P * NoverPSlider.value / 100);
 
                 if (fp === 0) {
                     redSeries.style.display = "none";
@@ -125,14 +132,16 @@
                 const N_minus_n = N - n;
                 let binomialCoefficient = 1;
                 for (let q = 2; q <= n; q++) binomialCoefficient /= q;
-                for (let q = N_minus_n; q <= N; q++) binomialCoefficient *= q;
+                for (let q = N_minus_n + 1; q <= N; q++) binomialCoefficient *= q;
                 // If the binomialCoefficient is infinite, assume that a normal approximation would work here
-                if (isFinite(binomialCoefficient)) {
-                    return Math.pow(fp, n) * Math.pow(1 - fp, N_minus_n) * binomialCoefficient;
+                if (n < 30) {
+                    const probability = Math.pow(fp, n) * Math.pow(1 - fp, N_minus_n) * binomialCoefficient;
+                    return probability;
                 } else {
+                    console.log(`Using approximation`);
                     const sigma = Math.sqrt(N * fp * (1 - fp));
                     const mu = N * fp;
-                    return 1 / Math.sqrt(2 * Math.PI) / sigma * Math.exp(Math.pow(n - mu, 2) / 2 / Math.pow(sigma, 2));
+                    return 1 / Math.sqrt(2 * Math.PI) / sigma * Math.exp(-Math.pow(n - mu, 2) / 2 / Math.pow(sigma, 2));
                 }
             }
         </script>
