@@ -4,8 +4,15 @@
         <title>Interactive Jury Distribution</title>
     </head>
     <style>
+        body {
+            font-family: Tahoma;
+        }
         input {
             width: 100%;
+        }
+        .legendSvg {
+            width: 3lh;
+            height: 1lh;
         }
         .sliderLabel {
             width: 100%;
@@ -20,7 +27,7 @@
         }
         #controlsDiv {
             position: absolute;
-            right: 0;
+            left: 65%;
             top: 50%;
             margin-right: 10px;
             transform: translate(0, -50%);
@@ -43,6 +50,11 @@
             width: 100%;
             height: 100%;
         }
+        #legend {
+            position: relative;
+            width: 100%;
+            padding: 10px;
+        }
         #axesAndSeriesSvg {
             position: absolute;
             left: 0;
@@ -64,7 +76,7 @@
             border-radius: 10px;
         }
     </style>
-    <body onload="redrawGraph()">
+    <body>
         <div id="warningDiv"></div>
         <div id="graphDiv">
             <svg id="graphBackgroundSvg">
@@ -72,13 +84,34 @@
             </svg>
             <svg id="axesAndSeriesSvg" viewBox="0 0 100 100" preserveAspectRatio="none">
                 <path stroke="#999" vector-effect="non-scaling-stroke" stroke-width="3" fill="none" d="M10 90H90"/>
-                <path id="verticalAxis" vector-effect="non-scaling-stroke" stroke="#999" stroke-width="3" fill="none" d="M50 90V10"/>
+                <path id="verticalAxis" vector-effect="non-scaling-stroke" stroke="#999" stroke-width="5" fill="none" d="M50 90V10"/>
                 <path id="redSeries" vector-effect="non-scaling-stroke" stroke="#F33" stroke-width="4" fill="none" d="M10 90"/>
                 <path id="supremeCourtLine" vector-effect="non-scaling-stroke" stroke-dasharray="10,10" stroke="#009" stroke-width="2" fill="none" d="M50 90V10"/>
                 <path id="acluLine" vector-effect="non-scaling-stroke" stroke-dasharray="10,10" stroke="#090" stroke-width="2" fill="none" d="M50 90V10"/>
             </svg>
+            <div id="legend">
+                <table>
+                    <tbody>
+                        <tr>
+                            <td><svg class="legendSvg" viewBox="0 0 30 10"><path stroke="#F33" stroke-width="3" d="M0 7H30"/></svg></td>
+                            <td>Probability of disparity</td>
+                        </tr>
+                        <tr>
+                            <td><svg class="legendSvg" viewBox="0 0 30 10"><path stroke-dasharray="3,3" stroke="#009" stroke-width="3" d="M0 7H30"/></svg></td>
+                            <td>10% disparity</td>
+                        </tr>
+                        <tr>
+                            <td><svg class="legendSvg" viewBox="0 0 30 10"><path stroke-dasharray="3,3" stroke="#090" stroke-width="3" d="M0 7H30"/></svg></td>
+                            <td>One standard deviation above mean</td>
+                        </tr>
+                    </tbody>
+                </table>
+            </div>
         </div>
         <div id="controlsDiv">
+            <div class="sliderLabel">Total population</div>
+            <div id="populationValue" class="valueLabel">0.5</div>
+            <input id="populationSlider" type="range"/>
             <div class="sliderLabel">Jury eligibility rate of general population</div>
             <div id="fpValue" class="valueLabel">0.5</div>
             <input id="fpSlider" type="range"/>
@@ -89,6 +122,14 @@
         <script>
             let isScaled = true;
             warningDiv.style.display = "none";
+            populationValue.innerHTML = parseInt(30000 * Math.pow(10, populationSlider.value / 100 * 6 - 6));
+            fpValue.innerHTML = fpSlider.value / 100;
+            NoverPValue.innerHTML = Math.pow(10, NoverPSlider.value / 100 * 3 - 3).toExponential(2);
+            redrawGraph();
+            populationSlider.addEventListener("input", () => {
+                populationValue.innerHTML = parseInt(3000000 * Math.pow(10, populationSlider.value / 100 * 6 - 6));
+                redrawGraph();
+            });
             fpSlider.addEventListener("input", () => {
                 fpValue.innerHTML = fpSlider.value / 100;
                 redrawGraph();
@@ -102,7 +143,7 @@
                 let yAbsoluteValues = [];
 
                 const fp = fpSlider.value / 100;
-                const P = 3000;
+                const P = parseInt(30000 * Math.pow(10, populationSlider.value / 100 * 3 - 3));
                 const N = parseInt(P * Math.pow(10, NoverPSlider.value / 100 * 3 - 3));
 
                 if (fp === 0) {
@@ -114,7 +155,8 @@
                 const xMetric = 40;
 
                 const p = parseInt(fp * P);
-                for (let n = 0; n <= N; n++) {
+                const nStep = Math.max(1, parseInt(N / 200));
+                for (let n = 0; n <= N; n += nStep) {
                     const i = N / P - n / p;
                     if (isScaled) {
                         xAbsoluteValues.push(2 * n / N - 1);
@@ -124,9 +166,26 @@
                     yAbsoluteValues.push(sampleDistribution(i, N, fp, n));
                 }
                 if (isScaled) {
+                    const centerLine = 2 * fp - 1;
                     verticalAxis.setAttribute(`d`, `M${(2 * fp - 1) * xMetric + 50} 90V10`);
                     supremeCourtLine.setAttribute(`d`, `M${(2 * (fp + 0.1) - 1) * xMetric + 50} 90V10`);
                     acluLine.setAttribute(`d`, `M${(2 * (fp * N + Math.sqrt(N * fp * (1 - fp))) / N - 1) * xMetric + 50} 90V10`);
+                    // Veritcal ticks
+                    [...axesAndSeriesSvg.querySelectorAll(".tick")].forEach(x => x.remove());
+                    const tickSpacing = 0.2;
+                    console.log(tickSpacing);
+                    for (let i = -10; i <= 10; i++) {
+                        const tickPosition = centerLine + i * tickSpacing;
+                        if (tickPosition < -0.9 || tickPosition > 0.9) continue;
+                        const tick = document.createElementNS("http://www.w3.org/2000/svg", "path");
+                        tick.classList.add("tick");
+                        tick.setAttribute("vector-effect", "non-scaling-stroke");
+                        tick.setAttribute("stroke", "#AAA");
+                        tick.setAttribute("stroke-width", "2");
+                        tick.setAttribute("fill", "none");
+                        tick.setAttribute("d", `M${50 + xMetric * tickPosition} 90V10`);
+                        axesAndSeriesSvg.insertBefore(tick, axesAndSeriesSvg.firstChild);
+                    }
                 } else {
                     verticalAxis.setAttribute(`d`, `M50 90V10`);
                     supremeCourtLine.setAttribute(`d`, `M55 90V10`);
@@ -160,7 +219,6 @@
                     const probability = Math.pow(fp, n) * Math.pow(1 - fp, N_minus_n) * binomialCoefficient;
                     return probability;
                 } else {
-                    console.log(`Using approximation`);
                     const sigma = Math.sqrt(N * fp * (1 - fp));
                     const mu = N * fp;
                     return 1 / Math.sqrt(2 * Math.PI) / sigma * Math.exp(-Math.pow(n - mu, 2) / 2 / Math.pow(sigma, 2));
